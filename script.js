@@ -3,8 +3,14 @@ const canvas = document.getElementById('canvas1');
 const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-ctx.fillStyle = 'white';
+
 console.log(ctx);
+const gradient = ctx.createLinearGradient(0,0,canvas.width,canvas.height);
+gradient.addColorStop(0, 'white');
+gradient.addColorStop(0.5, 'magenta');
+gradient.addColorStop(1, 'blue');
+ctx.fillStyle = gradient;
+ctx.strokeStyle = 'white';
 
 //Logic Line
 //DOM-Canvas-Effect-Particle-Animate
@@ -14,7 +20,7 @@ class Particle {
     //Initialize the Particle Attributes
     constructor(effect){
         this.effect = effect;
-        this.radius = 15;
+        this.radius = Math.random() * 5 + 2;
 
         // Initial position of the particles to be within the canvas
         this.x = this.radius + Math.random() * (this.effect.width 
@@ -23,16 +29,15 @@ class Particle {
             - this.radius * 2);
 
         // velocity of particles
-            this.vx = Math.random() * 4 - 2;
-            this.vy = Math.random() * 4 - 2;
+            this.vx = Math.random() * 1 - 0.5;
+            this.vy = Math.random() * 1 - 0.5;
     }
     //Initialize The Particle Render
     draw(context){
-        context.fillStyle = 'hsl(' + this.x * 0.3 + ', 100%, 50%)';
+        //context.fillStyle = 'hsl(' + this.x * 0.3 + ', 100%, 50%)';
         context.beginPath();
         context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         context.fill();
-        context.stroke();
     }
     // Run every frame (motions and behaviour)
     update(){
@@ -72,10 +77,47 @@ class Effect {
     }
     // Draw The Particles To Screen
     handleParticles(context){
-        this.particles.forEach(particles => {
-            particles.draw(context);
-            particles.update();
+        this.connectParticles(context);
+        this.particles.forEach(particle => {
+            particle.draw(context);
+            particle.update();
         })
+    }
+    //constellations effect
+    connectParticles(context){
+        // only connect particles within 100px
+        const maxDist = 100;
+
+        //coompare each particle against all opther particles (n^2)
+        for (let a = 0; a < this.particles.length; a++){
+            for (let b = a; b < this.particles.length; b++){
+                // calc dist x and y
+                const distx = this.particles[a].x - this.particles[b].x;
+                const disty = this.particles[a].y - this.particles[b].y;
+                //calc hypotenuse for distance between two points
+                const dist = Math.hypot(distx,disty);
+                
+                // if the dist is within range
+                if (dist < maxDist){
+                    // wrap the canvas state in save and restore to not change
+                    // the opacity of all opject, just the lines
+                    context.save();
+
+                    // the opacity of the line is determinted by the dist
+                    const opacity = 1- (dist/maxDist);
+                    context.globalAlpha = opacity;
+                    
+                    context.beginPath();
+                    //get the start point
+                    context.moveTo(this.particles[a].x, this.particles[a].y);
+                    //line to the end point
+                    context.lineTo(this.particles[b].x, this.particles[b].y);
+                    context.stroke();
+
+                    context.restore();
+                }
+            }
+        }
     }
 }
 
