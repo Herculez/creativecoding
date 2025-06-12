@@ -20,7 +20,7 @@ class Particle {
     //Initialize the Particle Attributes
     constructor(effect){
         this.effect = effect;
-        this.radius = Math.random() * 5 + 2;
+        this.radius = Math.floor(Math.random() * 5 + 4);
 
         // Initial position of the particles to be within the canvas
         this.x = this.radius + Math.random() * (this.effect.width 
@@ -29,8 +29,15 @@ class Particle {
             - this.radius * 2);
 
         // velocity of particles
-            this.vx = Math.random() * 1 - 0.5;
-            this.vy = Math.random() * 1 - 0.5;
+        this.vx = Math.random() * 1 - 0.5;
+        this.vy = Math.random() * 1 - 0.5;
+
+        // speed of push force
+        this.pushX = 0;
+        this.pushY = 0;
+
+        // friction
+        this.friction = 0.95
     }
     //Initialize The Particle Render
     draw(context){
@@ -41,33 +48,99 @@ class Particle {
     }
     // Run every frame (motions and behaviour)
     update(){
-        // move horizontally
-        this.x+= this.vx;
-        // move vertically
-        this.y+= this.vy;
+        if (this.effect.mouse.pressed){
+            
+            // get point distance between mouse and particle
+            const dx = this.x - this.effect.mouse.x;
+            const dy = this.y - this.effect.mouse.y;
+            const dist = Math.hypot(dx,dy);
 
-        // bounce particles off canvas horizontal bounds
-        if (this.x > this.effect.width - this.radius || this.x < this.radius){
+            const force = (this.effect.mouse.radius / dist) / 4;
+            
+            // get point ang between mouse and particle base don a positive x axis
+            if (dist < this.effect.mouse.radius){
+                const ang = Math.atan2(dy,dx);
+                
+                // move the particles away from the mouse in a circular fashion
+                this.pushX += Math.cos(ang) * force;
+                this.pushY += Math.sin(ang) * force;
+            }
+        }
+
+        // move horizontally
+        this.x+= (this.pushX *= this.friction) + this.vx;
+        // move vertically
+        this.y+= (this.pushY *= this.friction) + this.vy;
+
+        //If particles are pushed out of the bounds reset them back in
+        //if particles hit a wall, reverse their velocity and bounce them back
+        if (this.x < this.radius){
+            this.x = this.radius;
+            this.vx *= -1;
+        } else if (this.x > this.effect.width - this.radius){
+            this.x = this.effect.width - this.radius;
             this.vx *= -1;
         }
 
-        // bounce particles off canvas vertical bounds
-        if (this.y > this.effect.height - this.radius || this.y < this.radius){
+        if (this.y < this.radius){
+            this.y = this.radius;
+            this.vy *= -1;
+        } else if (this.y > this.effect.height - this.radius){
+            this.y = this.effect.height - this.radius;
             this.vy *= -1;
         }
+
+    }
+    reset(){
+        // reset the particles to be within the bounds of the canvas randomly
+        this.x = this.radius + Math.random() * (this.effect.width 
+            - this.radius * 2);
+        this.y = this.radius + Math.random() * (this.effect.height 
+            - this.radius * 2);
     }
 }
 
 // Manage all particles
 class Effect {
     //Initialize the Brain Of The Particles
-    constructor(canvas){
+    constructor(canvas, context){
         this.canvas = canvas;
+        this.context = context;
         this.width = this.canvas.width
         this.height = this.canvas.height
         this.particles = [];
-        this.numberOfParticles = 200;
+        this.numberOfParticles = 500;
         this.createParticles();
+
+        this.mouse = {
+            x: 0,
+            y: 0,
+            pressed: false,
+            radius: 50
+        }
+
+        // handle resize
+        window.addEventListener('resize', e => {
+            this.resize(e.target.window.innerWidth, e.target.window.innerHeight);
+        });
+        //handle mousemove
+        window.addEventListener('mousemove', e => {
+            if (this.mouse.pressed){
+                this.mouse.x = e.x;
+                this.mouse.y = e.y;
+            }
+        });
+        //handle mousedown
+        window.addEventListener('mousedown', e => {
+            this.mouse.pressed = true;
+            this.mouse.x = e.x;
+            this.mouse.y = e.y;
+        });
+        //handle mouseup
+        window.addEventListener('mouseup', e => {
+            this.mouse.pressed = false;
+        });
+        
     }
     //Create The Particles
     createParticles(){
@@ -119,9 +192,26 @@ class Effect {
             }
         }
     }
+    //resize the canvas, and redefine the colours as they reset on canvas change
+    //reset each particle to make sure it's within new bounds
+    resize(width, height){
+        this.canvas.height = height;
+        this.canvas.width = width;
+        this.width = width;
+        this.height = height;
+        const gradient = this.context.createLinearGradient(0,0,width,height);
+        gradient.addColorStop(0, 'white');
+        gradient.addColorStop(0.5, 'magenta');
+        gradient.addColorStop(1, 'blue');
+        this.context.fillStyle = gradient;
+        this.context.strokeStyle = 'white';
+        this.particles.forEach(particle => {
+            particle.reset();
+        })
+    }
 }
 
-const effect = new Effect(canvas);
+const effect = new Effect(canvas, ctx);
 effect.handleParticles(ctx);
 console.log(effect);
 
